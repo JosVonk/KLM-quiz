@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function Modal({ children, onClose }: { children: React.ReactNode; onClose?: () => void }) {
   useEffect(() => {
     document.body.style.overflow = 'hidden'
