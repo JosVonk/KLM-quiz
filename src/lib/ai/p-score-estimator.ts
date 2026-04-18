@@ -1,14 +1,20 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-
 export async function estimatePScore(
   questionText: string,
   options: string[],
   correctAnswer: string,
   topic: string
 ): Promise<number> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
+    console.error('GEMINI_API_KEY is not set')
+    return 0.5
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey)
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+
   const prompt = `You are an educational assessment expert. Estimate the difficulty of the following quiz question for HBO (Dutch higher professional education, bachelor level, year 3) students who have attended lectures on the topic but are not deep specialists.
 
 Topic: ${topic}
@@ -28,9 +34,13 @@ Respond with just the number, e.g.: 0.65`
     const result = await model.generateContent(prompt)
     const text = result.response.text().trim()
     const score = parseFloat(text)
-    if (isNaN(score)) return 0.5
+    if (isNaN(score)) {
+      console.error('Gemini returned non-numeric response:', text)
+      return 0.5
+    }
     return Math.max(0, Math.min(1, score))
-  } catch {
+  } catch (err) {
+    console.error('Gemini API error:', err)
     return 0.5
   }
 }
