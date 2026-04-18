@@ -24,14 +24,22 @@ export default function LobbyPage() {
   }, [supabase])
 
   useEffect(() => {
+    let cancelled = false
+
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
+      if (cancelled) return
       if (!user) { router.push('/login'); return }
+
       const { data } = await supabase.from('users').select('*').eq('id', user.id).single()
+      if (cancelled) return
       setCurrentUser(data)
       await loadPlayers()
+      if (cancelled) return
 
-      supabase.channel('challenges')
+      supabase.removeAllChannels()
+
+      supabase.channel(`challenges-${user.id}`)
         .on('postgres_changes', {
           event: 'INSERT', schema: 'public', table: 'challenges',
           filter: `challenged_id=eq.${user.id}`,
@@ -46,8 +54,12 @@ export default function LobbyPage() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, loadPlayers)
         .subscribe()
     }
+
     init()
-    return () => { supabase.removeAllChannels() }
+    return () => {
+      cancelled = true
+      supabase.removeAllChannels()
+    }
   }, [])
 
   async function sendChallenge(targetId: string) {
