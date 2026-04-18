@@ -1,6 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const client = new Anthropic()
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
 export async function estimatePScore(
   questionText: string,
@@ -22,14 +23,13 @@ Return ONLY a single decimal number between 0.0 and 1.0 representing the P-score
 
 Respond with just the number, e.g.: 0.65`
 
-  const message = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 10,
-    messages: [{ role: 'user', content: prompt }],
-  })
-
-  const text = (message.content[0] as { type: string; text: string }).text.trim()
-  const score = parseFloat(text)
-  if (isNaN(score)) return 0.5
-  return Math.max(0, Math.min(1, score))
+  try {
+    const result = await model.generateContent(prompt)
+    const text = result.response.text().trim()
+    const score = parseFloat(text)
+    if (isNaN(score)) return 0.5
+    return Math.max(0, Math.min(1, score))
+  } catch {
+    return 0.5
+  }
 }
