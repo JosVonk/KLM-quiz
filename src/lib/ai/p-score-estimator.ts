@@ -13,7 +13,7 @@ export async function estimatePScore(
   }
 
   const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
   const prompt = `You are an educational assessment expert. Estimate the difficulty of the following quiz question for HBO (Dutch higher professional education, bachelor level, year 3) students who have attended lectures on the topic but are not deep specialists.
 
