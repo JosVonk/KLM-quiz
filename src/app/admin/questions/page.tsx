@@ -8,6 +8,7 @@ import Link from 'next/link'
 export default function AdminQuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [filter, setFilter] = useState<'all' | 'flagged'>('all')
+  const [scanning, setScanning] = useState(false)
 
   async function load() {
     const res = await fetch('/api/admin/questions')
@@ -26,6 +27,16 @@ export default function AdminQuestionsPage() {
     load()
   }
 
+  async function scanAll() {
+    if (!confirm(`Re-scan P-scores for all ${questions.length} questions using AI (HBO-3 level)? This may take a minute.`)) return
+    setScanning(true)
+    const res = await fetch('/api/admin/questions/scan', { method: 'POST' })
+    const json = await res.json()
+    setScanning(false)
+    await load()
+    alert(`Done! Updated ${json.updated} questions.`)
+  }
+
   async function remove(id: string) {
     if (!confirm('Delete this question?')) return
     await fetch(`/api/admin/questions/${id}`, { method: 'DELETE' })
@@ -39,6 +50,9 @@ export default function AdminQuestionsPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-klm-dark">Questions</h1>
         <div className="flex gap-2">
+          <Button variant="secondary" onClick={scanAll} disabled={scanning}>
+            {scanning ? 'Scanning…' : 'Scan All P-scores'}
+          </Button>
           <Link href="/admin/questions/import"><Button variant="secondary">Import</Button></Link>
           <Link href="/admin/questions/new"><Button>+ New</Button></Link>
         </div>
@@ -67,7 +81,10 @@ export default function AdminQuestionsPage() {
                 <td className="py-2 pr-4">{q.p_score.toFixed(2)}</td>
                 <td className="py-2 pr-4">{q.rit_value?.toFixed(2) ?? '—'}</td>
                 <td className="py-2 pr-4">{q.times_asked}</td>
-                <td className="py-2 flex gap-1">
+                <td className="py-2 flex gap-1 flex-wrap">
+                  <Link href={`/admin/questions/${q.id}/edit`}>
+                    <Button variant="secondary" className="text-xs">Edit</Button>
+                  </Link>
                   {q.flagged && <Button variant="secondary" className="text-xs" onClick={() => approve(q.id)}>Approve</Button>}
                   <Button variant="danger" className="text-xs" onClick={() => remove(q.id)}>Delete</Button>
                 </td>
