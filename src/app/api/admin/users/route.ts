@@ -33,7 +33,7 @@ export async function PATCH(request: NextRequest) {
   if (!await assertAdmin(supabase)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
-  const { id, password, ladder_position } = body
+  const { id, password, ladder_position, is_admin } = body
 
   if (password) {
     const admin = serviceClient()
@@ -41,8 +41,11 @@ export async function PATCH(request: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
-  if (ladder_position !== undefined) {
-    const { error } = await supabase.from('users').update({ ladder_position }).eq('id', id)
+  if (ladder_position !== undefined || is_admin !== undefined) {
+    const updates: Record<string, unknown> = {}
+    if (ladder_position !== undefined) updates.ladder_position = ladder_position
+    if (is_admin !== undefined) updates.is_admin = is_admin
+    const { error } = await supabase.from('users').update(updates).eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   }
 

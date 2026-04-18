@@ -46,6 +46,18 @@ export default function AdminUsersPage() {
     else load()
   }
 
+  async function toggleAdmin(id: string, currentlyAdmin: boolean, username: string) {
+    if (!confirm(`${currentlyAdmin ? 'Remove' : 'Grant'} admin rights for "${username}"?`)) return
+    const res = await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, is_admin: !currentlyAdmin }),
+    })
+    const json = await res.json()
+    if (json.error) alert(json.error)
+    else load()
+  }
+
   async function deleteUser(id: string, username: string) {
     if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return
     const res = await fetch('/api/admin/users', {
@@ -108,6 +120,9 @@ export default function AdminUsersPage() {
                   </Button>
                   <Button variant="secondary" className="text-xs" onClick={() => resetPassword(u.id, u.username)}>
                     Reset PW
+                  </Button>
+                  <Button variant="secondary" className="text-xs" onClick={() => toggleAdmin(u.id, u.is_admin, u.username)}>
+                    {u.is_admin ? 'Revoke Admin' : 'Make Admin'}
                   </Button>
                   {!u.is_admin && (
                     <Button variant="danger" className="text-xs" onClick={() => deleteUser(u.id, u.username)}>
