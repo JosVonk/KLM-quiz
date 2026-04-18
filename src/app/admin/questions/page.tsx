@@ -101,7 +101,7 @@ export default function AdminQuestionsPage() {
             />
           </div>
           {scan.current && (
-            <p className="text-xs text-gray-500 truncate">"{scan.current}"</p>
+            <p className="text-xs text-gray-500 truncate">&ldquo;{scan.current}&rdquo;</p>
           )}
         </div>
       )}
