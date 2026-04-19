@@ -13,6 +13,7 @@ export default function LobbyPage() {
   const [players, setPlayers] = useState<User[]>([])
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [incomingChallenge, setIncomingChallenge] = useState<(Challenge & { challenger_name: string }) | null>(null)
+  const [pendingChallengeTargetId, setPendingChallengeTargetId] = useState<string | null>(null)
   const supabase = createClient()
   const router = useRouter()
 
@@ -22,6 +23,16 @@ export default function LobbyPage() {
       .select('*')
       .order('ladder_position', { ascending: true })
     setPlayers(data ?? [])
+  }, [supabase])
+
+  const loadPendingChallenge = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('challenges')
+      .select('challenged_id')
+      .eq('challenger_id', userId)
+      .eq('status', 'pending')
+      .maybeSingle()
+    setPendingChallengeTargetId(data?.challenged_id ?? null)
   }, [supabase])
 
   useEffect(() => {
@@ -36,6 +47,7 @@ export default function LobbyPage() {
       if (cancelled) return
       setCurrentUser(data)
       await loadPlayers()
+      await loadPendingChallenge(user.id)
       if (cancelled) return
 
       supabase.removeAllChannels()
@@ -48,6 +60,13 @@ export default function LobbyPage() {
           const c = payload.new as Challenge
           const { data: challenger } = await supabase.from('users').select('username').eq('id', c.challenger_id).single()
           setIncomingChallenge({ ...c, challenger_name: challenger?.username ?? 'Someone' })
+        })
+        .on('postgres_changes', {
+          event: 'UPDATE', schema: 'public', table: 'challenges',
+          filter: `challenger_id=eq.${user.id}`,
+        }, (payload) => {
+          const c = payload.new as Challenge
+          if (c.status !== 'pending') setPendingChallengeTargetId(null)
         })
         .subscribe()
 
@@ -72,6 +91,8 @@ export default function LobbyPage() {
     if (!res.ok) {
       const { error } = await res.json()
       alert(error)
+    } else {
+      setPendingChallengeTargetId(targetId)
     }
   }
 
@@ -127,6 +148,8 @@ export default function LobbyPage() {
                 currentUser={currentUser}
                 target={player}
                 onChallenge={sendChallenge}
+                isPending={pendingChallengeTargetId === player.id}
+                hasOutgoingChallenge={pendingChallengeTargetId !== null}
               />
             )}
           </div>
