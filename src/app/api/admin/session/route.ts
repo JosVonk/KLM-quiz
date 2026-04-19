@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+
+function serviceClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function GET() {
   const supabase = createClient()
@@ -14,9 +22,10 @@ export async function POST(request: NextRequest) {
   if (!user || !profile?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { active } = await request.json()
+  const admin = serviceClient()
 
   if (active) {
-    const { data: players } = await supabase
+    const { data: players } = await admin
       .from('users')
       .select('id')
       .eq('is_admin', false)
@@ -25,11 +34,15 @@ export async function POST(request: NextRequest) {
     if (players && players.length > 0) {
       const shuffled = [...players].sort(() => Math.random() - 0.5)
       await Promise.all(shuffled.map((p, i) =>
-        supabase.from('users').update({ ladder_position: i + 1 }).eq('id', p.id)
+        admin.from('users').update({ ladder_position: i + 1 }).eq('id', p.id)
       ))
     }
   }
 
-  await supabase.from('app_settings').upsert({ key: 'session_active', value: String(active) })
+  const { error } = await admin
+    .from('app_settings')
+    .upsert({ key: 'session_active', value: String(active) })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }
