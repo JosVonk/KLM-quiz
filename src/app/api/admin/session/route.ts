@@ -28,7 +28,6 @@ export async function POST(request: NextRequest) {
     const { data: players } = await admin
       .from('users')
       .select('id')
-      .eq('is_admin', false)
       .eq('ladder_position', 0)
 
     if (players && players.length > 0) {
