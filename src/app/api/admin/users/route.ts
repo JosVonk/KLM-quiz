@@ -45,7 +45,7 @@ export async function PATCH(request: NextRequest) {
     const updates: Record<string, unknown> = {}
     if (ladder_position !== undefined) updates.ladder_position = ladder_position
     if (is_admin !== undefined) updates.is_admin = is_admin
-    const { error } = await supabase.from('users').update(updates).eq('id', id)
+    const { error } = await serviceClient().from('users').update(updates).eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
