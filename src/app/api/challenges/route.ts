@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { canChallenge } from '@/lib/ladder/positions'
+
+function serviceClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function POST(request: NextRequest) {
   const supabase = createClient()
@@ -77,8 +85,11 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true })
   }
 
-  await supabase.from('challenges').update({ status: 'accepted' }).eq('id', challengeId)
-  const { data: match } = await supabase
+  const admin = serviceClient()
+
+  await admin.from('challenges').update({ status: 'accepted' }).eq('id', challengeId)
+
+  const { data: match, error: matchError } = await admin
     .from('matches')
     .insert({
       challenge_id: challengeId,
@@ -88,7 +99,11 @@ export async function PATCH(request: NextRequest) {
     .select()
     .single()
 
-  await supabase
+  if (matchError || !match) {
+    return NextResponse.json({ error: matchError?.message ?? 'Failed to create match' }, { status: 500 })
+  }
+
+  await admin
     .from('users')
     .update({ status: 'in_match', last_active_at: new Date().toISOString() })
     .in('id', [challenge.challenger_id, challenge.challenged_id])
