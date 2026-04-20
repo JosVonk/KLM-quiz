@@ -25,11 +25,7 @@ export async function POST(request: NextRequest) {
   const admin = serviceClient()
 
   if (active) {
-    const { data: players } = await admin
-      .from('users')
-      .select('id')
-      .eq('ladder_position', 0)
-
+    const { data: players } = await admin.from('users').select('id')
     if (players && players.length > 0) {
       const shuffled = [...players].sort(() => Math.random() - 0.5)
       await Promise.all(shuffled.map((p, i) =>
