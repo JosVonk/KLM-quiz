@@ -17,9 +17,10 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
   const admin = serviceClient()
 
+  // Fetch match and players with separate queries to avoid FK join issues
   const { data: match, error: matchError } = await admin
     .from('matches')
-    .select('*, player1:player1_id(id,username,ladder_position), player2:player2_id(id,username,ladder_position)')
+    .select('*')
     .eq('id', params.id)
     .single()
 
@@ -29,9 +30,22 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const p1Pos = (match.player1 as { ladder_position: number }).ladder_position
-  const p2Pos = (match.player2 as { ladder_position: number }).ladder_position
-  const highestPos = Math.min(p1Pos, p2Pos)
+  const { data: players, error: playersError } = await admin
+    .from('users')
+    .select('id, username, ladder_position')
+    .in('id', [match.player1_id, match.player2_id])
+
+  if (playersError) console.error('Players fetch error:', playersError)
+
+  const player1 = players?.find(p => p.id === match.player1_id)
+  const player2 = players?.find(p => p.id === match.player2_id)
+
+  if (!player1 || !player2) {
+    console.error('Players not found for match:', match.id, { player1_id: match.player1_id, player2_id: match.player2_id, players })
+    return NextResponse.json({ error: 'Players not found' }, { status: 500 })
+  }
+
+  const highestPos = Math.min(player1.ladder_position, player2.ladder_position)
 
   const { data: allQuestions } = await admin
     .from('questions')
@@ -46,5 +60,6 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   const tier = getPlayerTier(highestPos, totalPlayers ?? 50)
   const questions = selectQuestions(allQuestions ?? [], tier, 10)
 
-  return NextResponse.json({ match, questions, tier })
+  const matchWithPlayers = { ...match, player1, player2 }
+  return NextResponse.json({ match: matchWithPlayers, questions, tier })
 }
