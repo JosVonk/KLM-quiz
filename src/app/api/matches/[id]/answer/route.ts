@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { calculatePoints } from '@/lib/quiz/scoring'
 import { updatePScore, updateRit, shouldFlag } from '@/lib/quiz/psychometrics'
+
+function serviceClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -16,7 +24,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const isCorrect = answer === question.correct_answer
   const points = calculatePoints(isCorrect, timeMs, 20000)
 
-  await supabase.from('match_answers').insert({
+  const admin = serviceClient()
+  const { error: insertError } = await admin.from('match_answers').insert({
     match_id: params.id,
     player_id: user.id,
     question_id: questionId,
@@ -26,12 +35,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     points_awarded: points,
   })
 
+  if (insertError) {
+    console.error('match_answers insert error:', insertError)
+    return NextResponse.json({ error: 'Failed to save answer' }, { status: 500 })
+  }
+
   const newTimesAsked = question.times_asked + 1
   const newPScore = updatePScore(question.p_score, question.times_asked, isCorrect)
   const newRit = updateRit(question.rit_value, newTimesAsked, isCorrect, points, avgOpponentPoints ?? 600)
   const newFlagged = shouldFlag(newRit, newTimesAsked)
 
-  await supabase.from('questions').update({
+  await admin.from('questions').update({
     p_score: newPScore,
     rit_value: newRit,
     times_asked: newTimesAsked,

@@ -43,7 +43,10 @@ export async function POST(_: NextRequest, { params }: { params: { id: string } 
   }
 
   const opponentId = user.id === match.player1_id ? match.player2_id : match.player1_id
-  const opponentDone = (answerCounts[opponentId] ?? 0) >= QUESTIONS_PER_MATCH
+  const myCount = answerCounts[user.id] ?? 0
+  // Use actual question count for this player as the threshold (more reliable than hardcoded 10)
+  const threshold = myCount > 0 ? myCount : QUESTIONS_PER_MATCH
+  const opponentDone = (answerCounts[opponentId] ?? 0) >= threshold
 
   // Mark ended_at when first player finishes (if not set yet)
   if (!match.ended_at) {
