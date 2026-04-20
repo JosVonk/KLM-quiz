@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
     // Reset all players to idle and expire pending challenges on session stop
     await admin.from('users').update({ status: 'idle' }).neq('id', '00000000-0000-0000-0000-000000000000')
     await admin.from('challenges').update({ status: 'expired' }).eq('status', 'pending')
+    // Mark all unfinished matches as abandoned so old matches never pollute future sessions
+    await admin.from('matches').update({ winner_id: '00000000-0000-0000-0000-000000000000' }).is('winner_id', null)
   }
 
   const { error } = await admin

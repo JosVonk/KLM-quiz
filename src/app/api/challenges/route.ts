@@ -21,12 +21,13 @@ export async function GET() {
   const { data: currentUser } = await admin.from('users').select('status').eq('id', user.id).single()
   if (currentUser?.status !== 'in_match') return NextResponse.json({ matchId: null })
 
-  // Find the active unfinished match where this user is the challenger (player1)
+  // Find the MOST RECENT unfinished match where this user is the challenger (player1)
   const { data: matches, error } = await admin
     .from('matches')
     .select('id')
     .eq('player1_id', user.id)
     .is('winner_id', null)
+    .order('started_at', { ascending: false })
     .limit(1)
 
   if (error) console.error('GET /api/challenges match lookup error:', error)
