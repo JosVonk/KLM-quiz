@@ -59,7 +59,12 @@ export default function MatchPage({ params }: { params: { id: string } }) {
       setUserId(user.id)
 
       const res = await fetch(`/api/matches/${params.id}`)
-      if (!res.ok) { router.push('/lobby'); return }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error('Match load failed:', res.status, err)
+        router.push('/lobby')
+        return
+      }
       const { match, questions: qs }: { match: MatchData; questions: Question[] } = await res.json()
       setQuestions(qs)
 

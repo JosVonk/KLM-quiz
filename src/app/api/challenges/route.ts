@@ -17,15 +17,15 @@ export async function GET() {
 
   const admin = serviceClient()
 
-  // Find the most recent active (not yet finalized) match for this user as challenger
-  const { data: matches } = await admin
+  // Find an active (not yet finalized) match where this user is the challenger (player1)
+  const { data: matches, error } = await admin
     .from('matches')
     .select('id')
     .eq('player1_id', user.id)
     .is('winner_id', null)
-    .order('created_at', { ascending: false })
     .limit(1)
 
+  if (error) console.error('GET /api/challenges match lookup error:', error)
   const matchId = matches?.[0]?.id ?? null
   return NextResponse.json({ matchId })
 }
