@@ -17,12 +17,15 @@ export async function POST(_: NextRequest, { params }: { params: { id: string } 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: match } = await supabase.from('matches').select('*').eq('id', params.id).single()
-  if (!match) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
-
   const admin = serviceClient()
 
-  // If already fully finalized, just return current result
+  const { data: match, error: matchErr } = await admin.from('matches').select('*').eq('id', params.id).single()
+  if (!match) {
+    console.error('Match not found:', params.id, matchErr)
+    return NextResponse.json({ error: 'Match not found' }, { status: 404 })
+  }
+
+  // If already fully finalized, return current result
   if (match.winner_id) {
     const { data: answers } = await admin.from('match_answers').select('player_id, points_awarded').eq('match_id', params.id)
     const scores: Record<string, number> = {}
@@ -32,10 +35,12 @@ export async function POST(_: NextRequest, { params }: { params: { id: string } 
     return NextResponse.json({ winnerId: match.winner_id, scores, positionChange: 0, newPosition: me?.ladder_position ?? null, waiting: false })
   }
 
-  const { data: answers } = await admin
+  const { data: answers, error: answersErr } = await admin
     .from('match_answers')
     .select('player_id, points_awarded')
     .eq('match_id', params.id)
+
+  if (answersErr) console.error('match_answers read error:', answersErr)
 
   const scores: Record<string, number> = {}
   const answerCounts: Record<string, number> = {}
@@ -46,9 +51,11 @@ export async function POST(_: NextRequest, { params }: { params: { id: string } 
 
   const opponentId = user.id === match.player1_id ? match.player2_id : match.player1_id
   const myCount = answerCounts[user.id] ?? 0
-  // Use actual question count for this player as the threshold (more reliable than hardcoded 10)
   const threshold = myCount > 0 ? myCount : QUESTIONS_PER_MATCH
-  const opponentDone = (answerCounts[opponentId] ?? 0) >= threshold
+  const opponentCount = answerCounts[opponentId] ?? 0
+  const opponentDone = opponentCount >= threshold
+
+  console.log(`[end] match=${params.id} user=${user.id} myCount=${myCount} opponentCount=${opponentCount} threshold=${threshold} opponentDone=${opponentDone}`)
 
   // Mark ended_at when first player finishes (if not set yet)
   if (!match.ended_at) {
