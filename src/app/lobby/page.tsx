@@ -86,20 +86,8 @@ export default function LobbyPage() {
         const { data: s } = await supabase.from('app_settings').select('value').eq('key', 'session_active').single()
         setSessionActive(s?.value === 'true')
         // Redirect challenger when their challenge is accepted
-        const { data: accepted } = await supabase
-          .from('challenges')
-          .select('id')
-          .eq('challenger_id', user.id)
-          .eq('status', 'accepted')
-          .maybeSingle()
-        if (accepted) {
-          const { data: match } = await supabase
-            .from('matches')
-            .select('id')
-            .eq('challenge_id', accepted.id)
-            .maybeSingle()
-          if (match) router.push(`/match/${match.id}`)
-        }
+        const { matchId } = await fetch('/api/challenges').then(r => r.json())
+        if (matchId) router.push(`/match/${matchId}`)
       }, 5000)
 
       supabase.removeAllChannels()

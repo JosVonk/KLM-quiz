@@ -10,6 +10,30 @@ function serviceClient() {
   )
 }
 
+export async function GET() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const admin = serviceClient()
+  const { data: accepted } = await admin
+    .from('challenges')
+    .select('id')
+    .eq('challenger_id', user.id)
+    .eq('status', 'accepted')
+    .maybeSingle()
+
+  if (!accepted) return NextResponse.json({ matchId: null })
+
+  const { data: match } = await admin
+    .from('matches')
+    .select('id')
+    .eq('challenge_id', accepted.id)
+    .maybeSingle()
+
+  return NextResponse.json({ matchId: match?.id ?? null })
+}
+
 export async function POST(request: NextRequest) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
