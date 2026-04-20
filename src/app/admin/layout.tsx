@@ -7,6 +7,7 @@ const NAV = [
   { href: '/admin/session', label: 'Session' },
   { href: '/admin/questions', label: 'Questions' },
   { href: '/admin/users', label: 'Users' },
+  { href: '/admin/settings', label: 'Settings' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

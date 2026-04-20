@@ -4,15 +4,18 @@ export async function estimatePScore(
   questionText: string,
   options: string[],
   correctAnswer: string,
-  topic: string
+  topic: string,
+  apiKey?: string
 ): Promise<number> {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
+  const key = apiKey ?? process.env.GEMINI_API_KEY
+  if (!key) {
     console.error('GEMINI_API_KEY is not set')
     return 0.5
   }
+  // shadow the outer name so the rest of the function uses `key`
+  const apiKey_ = key
 
-  const genAI = new GoogleGenerativeAI(apiKey)
+  const genAI = new GoogleGenerativeAI(apiKey_)
   const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
 
   const prompt = `You are an educational assessment expert. Estimate the difficulty of the following quiz question for HBO (Dutch higher professional education, bachelor level, year 3) students who have attended lectures on the topic but are not deep specialists.
