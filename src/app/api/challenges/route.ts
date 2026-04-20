@@ -17,7 +17,11 @@ export async function GET() {
 
   const admin = serviceClient()
 
-  // Find an active (not yet finalized) match where this user is the challenger (player1)
+  // Only redirect if the user is actively in a match
+  const { data: currentUser } = await admin.from('users').select('status').eq('id', user.id).single()
+  if (currentUser?.status !== 'in_match') return NextResponse.json({ matchId: null })
+
+  // Find the active unfinished match where this user is the challenger (player1)
   const { data: matches, error } = await admin
     .from('matches')
     .select('id')
