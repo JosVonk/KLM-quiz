@@ -31,7 +31,7 @@ export default function MatchPage({ params }: { params: { id: string } }) {
   const [myScore, setMyScore] = useState(0)
   const [opponentScore, setOpponentScore] = useState(0)
   const [questionStartedAt, setQuestionStartedAt] = useState(Date.now())
-  const [phase, setPhase] = useState<'loading' | 'playing' | 'finished'>('loading')
+  const [phase, setPhase] = useState<'loading' | 'playing' | 'waiting' | 'finished'>('loading')
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null)
   const [myUsername, setMyUsername] = useState('')
   const [opponentUsername, setOpponentUsername] = useState('')
@@ -93,26 +93,49 @@ export default function MatchPage({ params }: { params: { id: string } }) {
     setMyScore(s => s + (points ?? 0))
   }, [currentIndex, questions, questionStartedAt, opponentScore, params.id])
 
+  const pollForResult = useCallback(async (matchId: string) => {
+    const res = await fetch(`/api/matches/${matchId}/end`, { method: 'POST' })
+    const result: MatchResult & { waiting?: boolean } = await res.json()
+    if (result.waiting) return false
+    setMatchResult(result)
+    setPhase('finished')
+    return true
+  }, [])
+
   const advanceQuestion = useCallback(async () => {
     await submitAnswer(selectedAnswer)
     setSelectedAnswer(null)
     answered.current = false
 
     if (currentIndex + 1 >= questions.length) {
-      const res = await fetch(`/api/matches/${params.id}/end`, { method: 'POST' })
-      const result: MatchResult = await res.json()
-      setMatchResult(result)
-      setPhase('finished')
+      setPhase('waiting')
+      const done = await pollForResult(params.id)
+      if (!done) {
+        const interval = setInterval(async () => {
+          const finished = await pollForResult(params.id)
+          if (finished) clearInterval(interval)
+        }, 3000)
+      }
     } else {
       setCurrentIndex(i => i + 1)
       setQuestionStartedAt(Date.now())
     }
-  }, [currentIndex, questions.length, selectedAnswer, submitAnswer, params.id])
+  }, [currentIndex, questions.length, selectedAnswer, submitAnswer, params.id, pollForResult])
 
   if (phase === 'loading') {
     return (
       <div className="flex items-center justify-center min-h-[80vh]">
         <p className="text-klm-blue animate-pulse text-lg font-semibold">Loading match…</p>
+      </div>
+    )
+  }
+
+  if (phase === 'waiting') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80vh] space-y-4 text-center px-4">
+        <p className="text-klm-blue animate-pulse text-xl font-semibold">Waiting for opponent to finish…</p>
+        <p className="text-gray-400 text-sm">Results will appear automatically</p>
+        <div className="mt-2 text-3xl font-bold text-klm-dark">{myScore} pts</div>
       </div>
     )
   }
