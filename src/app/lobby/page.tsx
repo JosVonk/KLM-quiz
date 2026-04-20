@@ -35,8 +35,25 @@ export default function LobbyPage() {
     setPendingChallengeTargetId(data?.challenged_id ?? null)
   }, [supabase])
 
+  const checkIncomingChallenge = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('challenges')
+      .select('*, challenger:challenger_id(username)')
+      .eq('challenged_id', userId)
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle()
+    if (data) {
+      const name = (data.challenger as { username: string } | null)?.username ?? 'Someone'
+      setIncomingChallenge({ ...data, challenger_name: name })
+    } else {
+      setIncomingChallenge(null)
+    }
+  }, [supabase])
+
   useEffect(() => {
     let cancelled = false
+    let pollInterval: ReturnType<typeof setInterval> | null = null
 
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -48,7 +65,16 @@ export default function LobbyPage() {
       setCurrentUser(data)
       await loadPlayers()
       await loadPendingChallenge(user.id)
+      await checkIncomingChallenge(user.id)
       if (cancelled) return
+
+      // Poll every 5s as reliable fallback for challenge notifications
+      pollInterval = setInterval(() => {
+        if (!cancelled) {
+          checkIncomingChallenge(user.id)
+          loadPendingChallenge(user.id)
+        }
+      }, 5000)
 
       supabase.removeAllChannels()
 
@@ -56,11 +82,7 @@ export default function LobbyPage() {
         .on('postgres_changes', {
           event: 'INSERT', schema: 'public', table: 'challenges',
           filter: `challenged_id=eq.${user.id}`,
-        }, async (payload) => {
-          const c = payload.new as Challenge
-          const { data: challenger } = await supabase.from('users').select('username').eq('id', c.challenger_id).single()
-          setIncomingChallenge({ ...c, challenger_name: challenger?.username ?? 'Someone' })
-        })
+        }, () => checkIncomingChallenge(user.id))
         .on('postgres_changes', {
           event: 'UPDATE', schema: 'public', table: 'challenges',
           filter: `challenger_id=eq.${user.id}`,
@@ -78,6 +100,7 @@ export default function LobbyPage() {
     init()
     return () => {
       cancelled = true
+      if (pollInterval) clearInterval(pollInterval)
       supabase.removeAllChannels()
     }
   }, [])
