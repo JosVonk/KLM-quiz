@@ -16,22 +16,18 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = serviceClient()
-  const { data: accepted } = await admin
-    .from('challenges')
-    .select('id')
-    .eq('challenger_id', user.id)
-    .eq('status', 'accepted')
-    .maybeSingle()
 
-  if (!accepted) return NextResponse.json({ matchId: null })
-
-  const { data: match } = await admin
+  // Find the most recent active (not yet finalized) match for this user as challenger
+  const { data: matches } = await admin
     .from('matches')
     .select('id')
-    .eq('challenge_id', accepted.id)
-    .maybeSingle()
+    .eq('player1_id', user.id)
+    .is('winner_id', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
 
-  return NextResponse.json({ matchId: match?.id ?? null })
+  const matchId = matches?.[0]?.id ?? null
+  return NextResponse.json({ matchId })
 }
 
 export async function POST(request: NextRequest) {
