@@ -32,6 +32,7 @@ export default function LobbyPage() {
       .select('challenged_id')
       .eq('challenger_id', userId)
       .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
       .maybeSingle()
     setPendingChallengeTargetId(data?.challenged_id ?? null)
   }, [supabase])
@@ -77,12 +78,13 @@ export default function LobbyPage() {
       await checkIncomingChallenge(user.id)
       if (cancelled) return
 
-      // Poll every 5s as reliable fallback for challenge notifications
-      pollInterval = setInterval(() => {
-        if (!cancelled) {
-          checkIncomingChallenge(user.id)
-          loadPendingChallenge(user.id)
-        }
+      // Poll every 5s: challenge notifications + session status
+      pollInterval = setInterval(async () => {
+        if (cancelled) return
+        checkIncomingChallenge(user.id)
+        loadPendingChallenge(user.id)
+        const { data: s } = await supabase.from('app_settings').select('value').eq('key', 'session_active').single()
+        setSessionActive(s?.value === 'true')
       }, 5000)
 
       supabase.removeAllChannels()
