@@ -20,17 +20,19 @@ export async function POST(_: NextRequest, { params }: { params: { id: string } 
   const { data: match } = await supabase.from('matches').select('*').eq('id', params.id).single()
   if (!match) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
 
-  // If already fully finalized, just return current result
-  if (match.winner_id) {
-    const { data: answers } = await supabase.from('match_answers').select('player_id, points_awarded').eq('match_id', params.id)
-    const scores: Record<string, number> = {}
-    for (const a of answers ?? []) scores[a.player_id] = (scores[a.player_id] ?? 0) + a.points_awarded
-    return NextResponse.json({ winnerId: match.winner_id, scores, positionChange: 0, waiting: false })
-  }
-
   const admin = serviceClient()
 
-  const { data: answers } = await supabase
+  // If already fully finalized, just return current result
+  if (match.winner_id) {
+    const { data: answers } = await admin.from('match_answers').select('player_id, points_awarded').eq('match_id', params.id)
+    const scores: Record<string, number> = {}
+    for (const a of answers ?? []) scores[a.player_id] = (scores[a.player_id] ?? 0) + a.points_awarded
+    const { data: players } = await admin.from('users').select('id, ladder_position').in('id', [match.player1_id, match.player2_id])
+    const me = players?.find(p => p.id === user.id)
+    return NextResponse.json({ winnerId: match.winner_id, scores, positionChange: 0, newPosition: me?.ladder_position ?? null, waiting: false })
+  }
+
+  const { data: answers } = await admin
     .from('match_answers')
     .select('player_id, points_awarded')
     .eq('match_id', params.id)
