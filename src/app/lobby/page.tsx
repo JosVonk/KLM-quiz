@@ -14,6 +14,7 @@ export default function LobbyPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [incomingChallenge, setIncomingChallenge] = useState<(Challenge & { challenger_name: string }) | null>(null)
   const [pendingChallengeTargetId, setPendingChallengeTargetId] = useState<string | null>(null)
+  const [sessionActive, setSessionActive] = useState<boolean | null>(null)
   const supabase = createClient()
   const router = useRouter()
 
@@ -63,6 +64,14 @@ export default function LobbyPage() {
       const { data } = await supabase.from('users').select('*').eq('id', user.id).single()
       if (cancelled) return
       setCurrentUser(data)
+
+      const { data: setting } = await supabase.from('app_settings').select('value').eq('key', 'session_active').single()
+      const active = setting?.value === 'true'
+      setSessionActive(active)
+      if (cancelled) return
+
+      if (!active && !data?.is_admin) return
+
       await loadPlayers()
       await loadPendingChallenge(user.id)
       await checkIncomingChallenge(user.id)
@@ -131,6 +140,20 @@ export default function LobbyPage() {
     if (action === 'accept' && json.matchId) {
       router.push(`/match/${json.matchId}`)
     }
+  }
+
+  if (sessionActive === null) {
+    return <div className="flex justify-center mt-20 text-klm-blue animate-pulse">Loading…</div>
+  }
+
+  if (!sessionActive && !currentUser?.is_admin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 text-center space-y-4">
+        <div className="text-5xl">🔴</div>
+        <h1 className="text-2xl font-bold text-klm-dark">Session not started yet</h1>
+        <p className="text-gray-500 max-w-sm">The quiz session hasn&apos;t started yet. Please wait for the admin to start the session.</p>
+      </div>
+    )
   }
 
   return (
