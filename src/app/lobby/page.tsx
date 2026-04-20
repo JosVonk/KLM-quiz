@@ -81,13 +81,18 @@ export default function LobbyPage() {
       // Poll every 5s: challenge notifications + session status + challenger redirect
       pollInterval = setInterval(async () => {
         if (cancelled) return
-        checkIncomingChallenge(user.id)
-        loadPendingChallenge(user.id)
-        const { data: s } = await supabase.from('app_settings').select('value').eq('key', 'session_active').single()
-        setSessionActive(s?.value === 'true')
-        // Redirect challenger when their challenge is accepted
-        const { matchId } = await fetch('/api/challenges').then(r => r.json())
-        if (matchId) router.push(`/match/${matchId}`)
+        try {
+          checkIncomingChallenge(user.id)
+          loadPendingChallenge(user.id)
+          const { data: s } = await supabase.from('app_settings').select('value').eq('key', 'session_active').single()
+          if (!cancelled) setSessionActive(s?.value === 'true')
+          // Redirect challenger when their challenge is accepted
+          const r = await fetch('/api/challenges')
+          if (r.ok) {
+            const { matchId } = await r.json()
+            if (matchId && !cancelled) router.push(`/match/${matchId}`)
+          }
+        } catch { /* ignore errors in poll to keep interval alive */ }
       }, 5000)
 
       supabase.removeAllChannels()
