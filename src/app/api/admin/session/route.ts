@@ -32,6 +32,10 @@ export async function POST(request: NextRequest) {
         admin.from('users').update({ ladder_position: i + 1 }).eq('id', p.id)
       ))
     }
+  } else {
+    // Reset all players to idle and expire pending challenges on session stop
+    await admin.from('users').update({ status: 'idle' }).neq('id', '00000000-0000-0000-0000-000000000000')
+    await admin.from('challenges').update({ status: 'expired' }).eq('status', 'pending')
   }
 
   const { error } = await admin
